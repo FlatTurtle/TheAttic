@@ -2,10 +2,20 @@
 
 header('Access-Control-Allow-Origin: *');
 
+$opts = array(
+    'http' => array(
+        'user_agent' => 'PHP libxml agent',
+    )
+);
+
+$context = stream_context_create($opts);
+libxml_set_streams_context($context);
+
 $url = $_GET['url'];
 
 header('Content-Type: application/json');
 $feed = new DOMDocument();
+$feed->recover = true;
 $feed->load($url);
 $json = array();
 
