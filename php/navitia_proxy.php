@@ -199,7 +199,7 @@ if ( !$url ) {
 // Split header text into an array.
 $header_text = preg_split( '/[\r\n]+/', $header );
 
-if(isset($_GET['mode']){
+if(isset($_GET['mode'])){
   if ( $_GET['mode'] == 'native' ) {
     if ( !$enable_native ) {
       $contents = 'ERROR: invalid mode';
