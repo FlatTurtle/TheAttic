@@ -1,5 +1,18 @@
 <?php
-header('Access-Control-Allow-Origin: *');
+// Allow from any origin
+if (isset($_SERVER['HTTP_ORIGIN'])) {
+    header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Max-Age: 86400');    // cache for 1 day
+}
+// Access-Control headers are received during OPTIONS requests
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']))
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");         
+    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']))
+        header("Access-Control-Allow-Headers:        {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
+    exit(0);
+}
 
 // Script: Simple PHP Proxy: Get external HTML, JSON and more!
 //
@@ -165,7 +178,7 @@ if ( !$url ) {
     curl_setopt( $ch, CURLOPT_POSTFIELDS, $_POST );
   }
   
-  if ( $_GET['send_cookies'] ) {
+  if ( isset($_GET['send_cookies']) ) {
     $cookie = array();
     foreach ( $_COOKIE as $key => $value ) {
       $cookie[] = $key . '=' . $value;
@@ -187,76 +200,78 @@ if ( !$url ) {
   );
   curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-  curl_setopt( $ch, CURLOPT_USERAGENT, $_GET['user_agent'] ? $_GET['user_agent'] : $_SERVER['HTTP_USER_AGENT'] );
+  curl_setopt( $ch, CURLOPT_USERAGENT, isset($_GET['user_agent']) ? $_GET['user_agent'] : $_SERVER['HTTP_USER_AGENT'] );
   
   list( $header, $contents ) = preg_split( '/([\r\n][\r\n])\\1/', curl_exec( $ch ), 2 );
   
   $status = curl_getinfo( $ch );
- 
+
   curl_close( $ch );
 }
 
 // Split header text into an array.
 $header_text = preg_split( '/[\r\n]+/', $header );
 
-if(isset($_GET['mode'])){
-  if ( $_GET['mode'] == 'native' ) {
-    if ( !$enable_native ) {
-      $contents = 'ERROR: invalid mode';
-      $status = array( 'http_code' => 'ERROR' );
-    }
-  
-    // Propagate headers to response.
-    foreach ( $header_text as $header ) {
-      if ( preg_match( '/^(?:Content-Type|Content-Language|Set-Cookie):/i', $header ) ) {
-        header( $header );
-      }
-    }
-  
-    print $contents;
-  
-  } else {
-  
-    // $data will be serialized into JSON data.
-    $data = array();
-  
-    // Propagate all HTTP headers into the JSON data object.
-    if ( isset($_GET['full_headers']) ) {
-      $data['headers'] = array();
-    
-      foreach ( $header_text as $header ) {
-        preg_match( '/^(.+?):\s+(.*)$/', $header, $matches );
-        if ( $matches ) {
-          $data['headers'][ $matches[1] ] = $matches[2];
-        }
-      }
-    }
-  
-    // Propagate all cURL request / response info to the JSON data object.
-    if ( isset($_GET['full_status']) ) {
-      $data['status'] = $status;
-    } else {
-      $data['status'] = array();
-      $data['status']['http_code'] = $status['http_code'];
-    }
-  
-    // Set the JSON data object contents, decoding it from JSON if possible.
-    $decoded_json = json_decode( $contents );
-    $data['contents'] = $decoded_json ? $decoded_json : $contents;
-  
-    // Generate appropriate content-type header.
-    $is_xhr = strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-    header( 'Content-type: application/' . ( $is_xhr ? 'json' : 'x-javascript' ) );
-  
-    // Get JSONP callback.
-    $jsonp_callback = $enable_jsonp && isset($_GET['callback']) ? $_GET['callback'] : null;
-  
-    // Generate JSON/JSONP string
-    $json = json_encode( $data );
-  
-    print $jsonp_callback ? "$jsonp_callback($json)" : $json;
-  
+if ( isset($_GET['mode']) && $_GET['mode'] == 'native' ) {
+  if ( !$enable_native ) {
+    $contents = 'ERROR: invalid mode';
+    $status = array( 'http_code' => 'ERROR' );
   }
+  
+  // Propagate headers to response.
+  foreach ( $header_text as $header ) {
+    if ( preg_match( '/^(?:Content-Type|Content-Language|Set-Cookie):/i', $header ) ) {
+      header( $header );
+    }
+  }
+  
+  print $contents;
+  
+} else {
+  
+  // $data will be serialized into JSON data.
+  $data = array();
+  
+  // Propagate all HTTP headers into the JSON data object.
+  if ( isset($_GET['full_headers']) ) {
+    $data['headers'] = array();
+  
+    foreach ( $header_text as $header ) {
+      preg_match( '/^(.+?):\s+(.*)$/', $header, $matches );
+      if ( $matches ) {
+        $data['headers'][ $matches[1] ] = $matches[2];
+      }
+    }
+  }
+  
+  // Propagate all cURL request / response info to the JSON data object.
+  if ( isset($_GET['full_status']) ) {
+    $data['status'] = $status;
+  } else {
+    $data['status'] = array();
+    $data['status']['http_code'] = $status['http_code'];
+  }
+  
+  // Set the JSON data object contents, decoding it from JSON if possible.
+  $decoded_json = json_decode( $contents );
+  $data['contents'] = $decoded_json ? $decoded_json : $contents;
+  
+  // Generate appropriate content-type header.
+  if(isset($_SERVER['HTTP_X_REQUESTED_WITH']))
+    $is_xhr = strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+  else
+    $is_xhr = '';
+  header( 'Content-type: application/' . ( $is_xhr ? 'json' : 'x-javascript' ) );
+  
+  // Get JSONP callback.
+  $jsonp_callback = $enable_jsonp && isset($_GET['callback']) ? $_GET['callback'] : null;
+  
+  // Generate JSON/JSONP string
+  $json = json_encode( $data );
+  
+  print $jsonp_callback ? "$jsonp_callback($json)" : $json;
+  
 }
+
 ?>
 
